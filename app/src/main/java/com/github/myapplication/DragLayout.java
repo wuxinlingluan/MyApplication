@@ -78,7 +78,45 @@ public class DragLayout extends FrameLayout {
                 main.offsetLeftAndRight(newDx);
             }
         }
+
+        /**
+         * 释放视图的回调
+         * @param releasedChild
+         * @param xvel
+         * @param yvel
+         */
+        @Override
+        public void onViewReleased(View releasedChild, float xvel, float yvel) {
+            super.onViewReleased(releasedChild, xvel, yvel);
+            if (main.getLeft() < maxDragRange * 0.5f) {
+                close();
+            } else {
+                open();
+            }
+        }
     };
+
+    private void open() {
+        if (helper.smoothSlideViewTo(main, maxDragRange, 0)) {
+            invalidate();
+        }
+
+    }
+
+    @Override
+    public void computeScroll() {
+        super.computeScroll();
+        if (helper.continueSettling(true)){
+            invalidate();
+        }
+    }
+
+    private void close() {
+        if (helper.smoothSlideViewTo(main, 0, 0)) {
+            invalidate();
+        }
+    }
+
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
