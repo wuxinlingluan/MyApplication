@@ -1,6 +1,8 @@
 package com.github.myapplication;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.support.v4.widget.ViewDragHelper;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -57,6 +59,11 @@ public class DragLayout extends FrameLayout {
         }
 
         @Override
+        public int getViewHorizontalDragRange(View child) {
+            return maxDragRange;
+        }
+
+        @Override
         public int clampViewPositionVertical(View child, int top, int dy) {
             return top;
         }
@@ -77,7 +84,54 @@ public class DragLayout extends FrameLayout {
                 int newDx = newLeft - oldLeft;
                 main.offsetLeftAndRight(newDx);
             }
+            //计算移动距离占总距离的百分比
+            float percent = main.getLeft() * 1.0f / maxDragRange;
+            executeAnimation(percent);
+
+            executeListener(percent);
         }
+
+
+        private void executeAnimation(float percent) {
+            float evaluate = evaluate(percent, 1.0f, 0.75f);
+            main.setScaleX(evaluate);
+            main.setScaleY(evaluate);
+
+            evaluate = evaluate(percent, 0.6f, 1.0f);
+            menu.setScaleY(evaluate);
+            menu.setScaleY(evaluate);
+            //menu的平移
+            evaluate = evaluate(percent, -maxDragRange * 0.75f, 0);
+            menu.setTranslationX(evaluate);
+            int color = evaluateArgb(percent, Color.BLACK, Color.TRANSPARENT);
+            getBackground().setColorFilter(color, PorterDuff.Mode.SRC_OVER);
+        }
+
+        public int evaluateArgb(float fraction, int startValue, int endValue) {
+            int startInt = (Integer) startValue;
+            int startA = (startInt >> 24) & 0xff;
+            int startR = (startInt >> 16) & 0xff;
+            int startG = (startInt >> 8) & 0xff;
+            int startB = startInt & 0xff;
+
+            int endInt = (Integer) endValue;
+            int endA = (endInt >> 24) & 0xff;
+            int endR = (endInt >> 16) & 0xff;
+            int endG = (endInt >> 8) & 0xff;
+            int endB = endInt & 0xff;
+
+            return (int) ((startA + (int) (fraction * (endA - startA))) << 24) |
+                    (int) ((startR + (int) (fraction * (endR - startR))) << 16) |
+                    (int) ((startG + (int) (fraction * (endG - startG))) << 8) |
+                    (int) ((startB + (int) (fraction * (endB - startB))));
+        }
+
+        public float evaluate(float fraction, Number startValue, Number endValue) {
+            float startFloat = startValue.floatValue();
+            return startFloat + fraction * (endValue.floatValue() - startFloat);
+        }
+
+
 
         /**
          * 释放视图的回调
@@ -96,6 +150,47 @@ public class DragLayout extends FrameLayout {
         }
     };
 
+    private void executeListener(float percent) {
+        if (percent==0){
+            currentState=DragState.CLOSE;
+        } else if (percent==1){
+            currentState=DragState.OPEN;
+        } else {
+            currentState=DragState.DRAGGING;
+        } if (currentState==DragState.CLOSE) {
+            if (listenter!=null){
+                listenter.onClose();
+            }
+        } else if (currentState==DragState.OPEN){
+            if (listenter!=null){
+                listenter.onOpen();
+            }
+        } else if (currentState==DragState.DRAGGING){
+            if (listenter!=null){
+                listenter.onDragging(percent);
+            }
+        }
+    }
+
+    //定义接口
+    private OnDragStateChangedListenter listenter;
+
+    public boolean isOpen() {
+        return currentState==DragState.OPEN;
+    }
+
+    public interface OnDragStateChangedListenter {
+            void onOpen();
+            void onDragging(float percent);
+            void onClose();
+    }
+    public void setOnDragStateChangedListener(OnDragStateChangedListenter listenter){
+        this.listenter=listenter;
+    }
+    private DragState currentState=DragState.CLOSE;
+    public  enum DragState{
+        OPEN,CLOSE,DRAGGING
+    }
     private void open() {
         if (helper.smoothSlideViewTo(main, maxDragRange, 0)) {
             invalidate();
@@ -106,7 +201,7 @@ public class DragLayout extends FrameLayout {
     @Override
     public void computeScroll() {
         super.computeScroll();
-        if (helper.continueSettling(true)){
+        if (helper.continueSettling(true)) {
             invalidate();
         }
     }
